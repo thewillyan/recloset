@@ -1,6 +1,7 @@
 use chrono::NaiveDate;
 use std::fmt;
 use std::rc::{Rc, Weak};
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 pub struct Clth {
@@ -139,7 +140,7 @@ impl Style {
 }
 
 pub struct Clothes {
-    pub list: Vec<Rc<Clth>>,
+    pub list: Vec<Rc<RefCell<Clth>>>,
 }
 
 impl Clothes {
@@ -154,19 +155,15 @@ impl Clothes {
         })
     }
 
-    pub fn from_rcs(list: Vec<Rc<Clth>>) -> Clothes {
-        Clothes { list }
-    }
-
     pub fn add(&mut self, clth: Clth) {
         if let Some(_) = self.get(clth.id) {
             panic!("A clothing with the same id already exists in 'Clothes'");
         }
-        self.list.push(Rc::new(clth));
+        self.list.push(Rc::new(RefCell::new(clth)));
     }
 
     pub fn request_id(&self) -> u32 {
-        let ids: Vec<u32> = self.list.iter().map(|clth| clth.id).collect();
+        let ids: Vec<u32> = self.list.iter().map(|clth| clth.borrow().id).collect();
         let mut new_id = 0;
         while ids.contains(&new_id) {
             new_id += 1
@@ -174,9 +171,9 @@ impl Clothes {
         new_id
     }
 
-    pub fn get(&self, id: u32) -> Option<&Rc<Clth>> {
+    pub fn get(&self, id: u32) -> Option<&Rc<RefCell<Clth>>> {
         for clth in self.list.iter() {
-            if clth.id == id {
+            if clth.borrow().id == id {
                 return Some(clth);
             }
         }
@@ -188,12 +185,12 @@ impl Clothes {
             .list
             .iter()
             .fold(Vec::new(), |mut acc, clth| {
-                if clth.kind == kind {
+                if clth.borrow().kind == kind {
                     acc.push(Rc::clone(clth));
                 }
                 acc
             });
-        Self::from_rcs(filtered)
+        Clothes { list: filtered }
     }
 
     pub fn filter_by_sex(&self, sex: Sex) -> Clothes {
@@ -201,12 +198,12 @@ impl Clothes {
             .list
             .iter()
             .fold(Vec::new(), |mut acc, clth| {
-                if clth.sex == sex {
+                if clth.borrow().sex == sex {
                     acc.push(Rc::clone(clth));
                 }
                 acc
             });
-        Self::from_rcs(filtered)
+        Clothes { list: filtered }
     }
 
     pub fn filter_by_size(&self, size: Size) -> Clothes {
@@ -214,12 +211,12 @@ impl Clothes {
             .list
             .iter()
             .fold(Vec::new(), |mut acc, clth| {
-                if clth.size == size {
+                if clth.borrow().size == size {
                     acc.push(Rc::clone(clth));
                 }
                 acc
             });
-        Self::from_rcs(filtered)
+        Clothes { list: filtered }
     }
 
     pub fn filter_by_color(&self, color: Rgb) -> Clothes {
@@ -227,12 +224,12 @@ impl Clothes {
             .list
             .iter()
             .fold(Vec::new(), |mut acc, clth| {
-                if clth.color == color {
+                if clth.borrow().color == color {
                     acc.push(Rc::clone(clth));
                 }
                 acc
             });
-        Self::from_rcs(filtered)
+        Clothes { list: filtered }
     }
 
     pub fn filter_by_style(&self, name: &str) -> Clothes {
@@ -240,12 +237,12 @@ impl Clothes {
             .list
             .iter()
             .fold(Vec::new(), |mut acc, clth| {
-                if clth.style.name == name {
+                if clth.borrow().style.name == name {
                     acc.push(Rc::clone(clth));
                 }
                 acc
             });
-        Self::from_rcs(filtered)
+        Clothes { list: filtered }
     }
 
     pub fn map_by_target(&self) -> HashMap<&str, Clothes> {
@@ -254,7 +251,7 @@ impl Clothes {
         let mut sale = Vec::new();
 
         for clth in self.list.iter() {
-            match clth.target {
+            match clth.borrow().target {
                 Target::Keep => keep.push(Rc::clone(clth)),
                 Target::Donation => donation.push(Rc::clone(clth)),
                 Target::Sale(_) => sale.push(Rc::clone(clth)),
@@ -262,9 +259,9 @@ impl Clothes {
         }
 
         let mut map = HashMap::new();
-        map.insert("keep", Self::from_rcs(keep));
-        map.insert("donation", Self::from_rcs(donation));
-        map.insert("sale", Self::from_rcs(sale));
+        map.insert("keep", Clothes { list: keep });
+        map.insert("donation", Clothes { list: donation });
+        map.insert("sale", Clothes { list: sale});
         map
     }
 
@@ -274,7 +271,7 @@ impl Clothes {
         let mut foot = Vec::new();
 
         for clth in self.list.iter() {
-            match clth.kind {
+            match clth.borrow().kind {
                 Kind::Chest => chest.push(Rc::clone(clth)),
                 Kind::Leg => legs.push(Rc::clone(clth)),
                 Kind::Foot => foot.push(Rc::clone(clth)),
@@ -282,9 +279,9 @@ impl Clothes {
         }
 
         let mut map = HashMap::new();
-        map.insert("chest", Self::from_rcs(chest));
-        map.insert("leg", Self::from_rcs(legs));
-        map.insert("foot", Self::from_rcs(foot));
+        map.insert("chest", Clothes { list: chest });
+        map.insert("leg", Clothes { list: legs });
+        map.insert("foot", Clothes { list: foot });
         map
     }
 
@@ -297,7 +294,7 @@ impl fmt::Display for Clothes {
         } else {
             self.list
                 .iter()
-                .map(|clth| clth.to_string())
+                .map(|clth| clth.borrow().to_string())
                 .collect::<Vec<_>>()
                 .join("\n\n")
         };
@@ -340,36 +337,30 @@ impl Styles {
 }
 
 pub struct ClthSet {
-    upper: Weak<Clth>,
-    lower: Weak<Clth>,
-    foot: Weak<Clth>,
+    upper: Weak<RefCell<Clth>>,
+    lower: Weak<RefCell<Clth>>,
+    foot: Weak<RefCell<Clth>>,
 }
 
 impl ClthSet {
     pub fn new(
-        upper: Weak<Clth>,
-        lower: Weak<Clth>,
-        foot: Weak<Clth>,
+        upper: Weak<RefCell<Clth>>,
+        lower: Weak<RefCell<Clth>>,
+        foot: Weak<RefCell<Clth>>,
     ) -> Result<ClthSet, &'static str> {
-        let Clth {
-            style: up_stl,
-            kind: up_kind,
-            ..
-        } = &*upper.upgrade().unwrap();
+        let up = upper.upgrade().unwrap();
+        let up_stl = &up.borrow().style.name;
+        let up_kind = &up.borrow().kind;
 
-        let Clth {
-            style: low_stl,
-            kind: low_kind,
-            ..
-        } = &*lower.upgrade().unwrap();
+        let low = lower.upgrade().unwrap();
+        let low_stl = &low.borrow().style.name;
+        let low_kind = &low.borrow().kind;
 
-        let Clth {
-            style: foot_stl,
-            kind: foot_kind,
-            ..
-        } = &*foot.upgrade().unwrap();
+        let ft = foot.upgrade().unwrap();
+        let foot_stl = &ft.borrow().style.name;
+        let foot_kind = &ft.borrow().kind;
 
-        if !(up_stl.name == low_stl.name && low_stl.name == foot_stl.name) {
+        if !(up_stl == low_stl && low_stl == foot_stl) {
             return Err("The clothes of a clothing set must have the same style.");
         }
 
@@ -380,15 +371,15 @@ impl ClthSet {
         }
     }
 
-    pub fn upper(&self) -> Weak<Clth> {
+    pub fn upper(&self) -> Weak<RefCell<Clth>> {
         Weak::clone(&self.upper)
     }
 
-    pub fn lower(&self) -> Weak<Clth> {
+    pub fn lower(&self) -> Weak<RefCell<Clth>> {
         Weak::clone(&self.lower)
     }
 
-    pub fn foot(&self) -> Weak<Clth> {
+    pub fn foot(&self) -> Weak<RefCell<Clth>> {
         Weak::clone(&self.foot)
     }
 }
@@ -401,7 +392,7 @@ mod tests {
 
     #[test]
     fn reject_invalid_clthset() {
-        let clth1 = Rc::new(Clth::new(
+        let clth1 = Rc::new(RefCell::new(Clth::new(
             0,
             Kind::Chest,
             Sex::Male,
@@ -410,9 +401,9 @@ mod tests {
             Target::Keep,
             Local::today().naive_local(),
             Rc::new(Style::new("style1")),
-        ));
+        )));
 
-        let clth2 = Rc::new(Clth::new(
+        let clth2 = Rc::new(RefCell::new(Clth::new(
             0,
             Kind::Leg,
             Sex::Male,
@@ -421,9 +412,9 @@ mod tests {
             Target::Keep,
             Local::today().naive_local(),
             Rc::new(Style::new("style2")),
-        ));
+        )));
 
-        let clth3 = Rc::new(Clth::new(
+        let clth3 = Rc::new(RefCell::new(Clth::new(
             0,
             Kind::Foot,
             Sex::Male,
@@ -432,7 +423,7 @@ mod tests {
             Target::Keep,
             Local::today().naive_local(),
             Rc::new(Style::new("style3")),
-        ));
+        )));
 
         let set1 = ClthSet::new(
             Rc::downgrade(&clth1),
@@ -452,7 +443,7 @@ mod tests {
     #[test]
     fn accept_valid_clthset() {
         let style = Rc::new(Style::new("style"));
-        let clth1 = Rc::new(Clth::new(
+        let clth1 = Rc::new(RefCell::new(Clth::new(
             0,
             Kind::Chest,
             Sex::Male,
@@ -461,9 +452,9 @@ mod tests {
             Target::Keep,
             Local::today().naive_local(),
             Rc::clone(&style),
-        ));
+        )));
 
-        let clth2 = Rc::new(Clth::new(
+        let clth2 = Rc::new(RefCell::new(Clth::new(
             0,
             Kind::Leg,
             Sex::Male,
@@ -472,9 +463,9 @@ mod tests {
             Target::Keep,
             Local::today().naive_local(),
             Rc::clone(&style),
-        ));
+        )));
 
-        let clth3 = Rc::new(Clth::new(
+        let clth3 = Rc::new(RefCell::new(Clth::new(
             0,
             Kind::Foot,
             Sex::Male,
@@ -483,7 +474,7 @@ mod tests {
             Target::Keep,
             Local::today().naive_local(),
             style,
-        ));
+        )));
 
         assert!(ClthSet::new(
             Rc::downgrade(&clth1),

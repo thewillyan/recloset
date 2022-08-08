@@ -1,7 +1,9 @@
+use crate::closet::{ Clth, Clothes, Kind, Sex, Size, Target, Rgb };
 use std::process;
-use crate::menu::{ Menu, Act, Runner};
-use crate::closet::{ Kind, Sex, Size, Target, Rgb };
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::io::{ self, Write };
+use crate::menu::{ Menu, Act, Runner};
 
 pub enum ErrType {
     Recover,
@@ -193,4 +195,40 @@ pub fn style_name() -> Result<String, InputErr> {
     }
 
     Ok(input)
+}
+
+pub fn select_clth(clothes: &Clothes) -> Result<Rc<RefCell<Clth>>, InputErr> {
+    if clothes.list.is_empty() {
+        return Err(InputErr {
+            class: ErrType::Abort,
+            msg: String::from("No clothes to choose from.")
+        })
+    }
+
+    let input = read_not_empty("Select a id: ").to_lowercase();
+
+    if input == "exit" {
+        return Err(InputErr::user_abort());
+    }
+
+    let id: u32 = match input.parse() {
+        Ok(id) => id,
+        Err(_) => return Err(InputErr::wrong("Invalid number!")),
+    };
+
+    match clothes.get(id) {
+        Some(clth) => Ok(Rc::clone(clth)),
+        None => Err(InputErr::wrong("Invalid id!")),
+    }
+}
+
+pub fn select_clth_field() -> Result<String, InputErr> {
+    let fields = ["Color", "Kind", "Size", "Sex", "Target","Style" ,"Exit"];
+    let menu = menu_from_vec("field menu", &fields);
+    let sel_index = Runner::new(menu).run("Select a field: ").unwrap();
+
+    match sel_index {
+        0..=5 => Ok(fields[sel_index].to_lowercase()),
+        _ => Err(InputErr::user_abort()),
+    }
 }
