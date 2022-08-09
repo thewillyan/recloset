@@ -14,7 +14,7 @@ use input::InputErr;
 pub struct Data {
     pub clothes: Clothes,
     pub styles: Styles,
-    pub clth_sets: Vec<ClthSet>,
+    pub clth_sets: ClthSets,
     pub cache: TmpCache,
 }
 
@@ -23,7 +23,7 @@ impl Data {
         Data {
             clothes: Clothes::new(),
             styles: Styles::new(),
-            clth_sets: Vec::new(),
+            clth_sets: ClthSets::new(),
             cache: TmpCache::new(),
         }
     }
@@ -140,7 +140,7 @@ pub fn user_add_clth(data: &mut Data) {
 }
 
 pub fn user_update_clth(data: &mut Data) {
-    println!("{}", data.clothes);
+    println!("{}\n", data.clothes);
     let clth = InputErr::until_ok(|| input::select_clth(&data.clothes));
     if let None = clth { return ;}
     let field = InputErr::until_ok(input::select_clth_field);
@@ -150,22 +150,30 @@ pub fn user_update_clth(data: &mut Data) {
         "color" => {
             let color = InputErr::until_ok(input::color);
             if let None = color { return ;}
-            clth.unwrap().borrow_mut().color = color.unwrap()
+            clth.unwrap().borrow_mut().color = color.unwrap();
         },
         "kind" => {
+            let clth = clth.unwrap();
+
+            if Rc::weak_count(&clth) != 0 {
+                eprintln!("Can't update the kind of a clothing that is in \
+                some clothing set.");
+                return;
+            }
+
             let kind = InputErr::until_ok(input::kind);
             if let None = kind { return ;}
-            clth.unwrap().borrow_mut().kind = kind.unwrap()
+            clth.borrow_mut().kind = kind.unwrap();
         },
         "size" => {
             let size = InputErr::until_ok(input::size);
             if let None = size { return ;}
-            clth.unwrap().borrow_mut().size = size.unwrap()
+            clth.unwrap().borrow_mut().size = size.unwrap();
         },
         "sex" => {
             let sex = InputErr::until_ok(input::sex);
             if let None = sex { return ;}
-            clth.unwrap().borrow_mut().sex = sex.unwrap()
+            clth.unwrap().borrow_mut().sex = sex.unwrap();
         },
         "target" => {
             let price = match InputErr::until_ok(input::price) {
@@ -175,17 +183,60 @@ pub fn user_update_clth(data: &mut Data) {
 
             let target = InputErr::until_ok(|| input::target(price));
             if let None = target { return ;}
-            clth.unwrap().borrow_mut().target = target.unwrap()
+            clth.unwrap().borrow_mut().target = target.unwrap();
         },
         "style" => {
+            let clth = clth.unwrap();
+
+            if Rc::weak_count(&clth) != 0 {
+                eprintln!("Can't update the style of a clothing that is in \
+                some clothing set.");
+                return;
+            }
+
             let stl_name = match InputErr::until_ok(input::style_name) {
                 Some(name) => name,
                 None => return,
             };
 
-            clth.unwrap().borrow_mut().style = data.styles.get_or_add(&stl_name)
+            clth.borrow_mut().style = data.styles.get_or_add(&stl_name);
         },
         value => panic!("Expecting a clothing field, found: '{}'.", value)
+    }
+}
+
+pub fn user_add_clth_set(data: &mut Data) {
+    let map = data.clothes.map_by_kind();
+    let chests = map.get("chest").unwrap();
+    let leggings = map.get("leg").unwrap();
+    let footwears = map.get("foot").unwrap();
+
+    println!("\n{}", chests);
+    let chest = match InputErr::until_ok(|| input::select_clth(chests)) {
+        Some(clth) => clth,
+        None => return,
+    };
+
+    println!("\n{}", leggings);
+    let leg = match InputErr::until_ok(|| input::select_clth(leggings)) {
+        Some(clth) => clth,
+        None => return,
+    };
+
+    println!("\n{}", footwears);
+    let foot = match InputErr::until_ok(|| input::select_clth(footwears)) {
+        Some(clth) => clth,
+        None => return,
+    };
+
+    let clth_set = ClthSet::new(
+        Rc::downgrade(&chest),
+        Rc::downgrade(&leg),
+        Rc::downgrade(&foot));
+
+    match clth_set {
+        Ok(set) => data.clth_sets.add(set),
+        Err(msg) => eprintln!("Error while creating set: {}", msg),
     }
 }
 
@@ -194,20 +245,27 @@ pub enum Event {
     AddClth,
     ListClths,
     UpdateClth,
+    AddClthSet,
+    ListClthSets,
     Back,
     Quit,
 }
 
 pub fn run(mut data: Data) {
-    let mut clth_menu = Menu::new("Clothing options");
+    let mut clth_menu = Menu::new("Clothes");
     clth_menu.add_action(Act::new("Add clothing", Event::AddClth));
     clth_menu.add_action(Act::new("Update clothing", Event::UpdateClth));
     clth_menu.add_action(Act::new("List clothes", Event::ListClths));
-
     clth_menu.add_action(Act::new("Back", Event::Back));
+
+    let mut set_menu = Menu::new("Sets");
+    set_menu.add_action(Act::new("Add set", Event::AddClthSet));
+    set_menu.add_action(Act::new("List sets", Event::ListClthSets));
+    set_menu.add_action(Act::new("Back", Event::Back));
 
     let mut menu = Menu::new("root");
     menu.add_submenu(clth_menu);
+    menu.add_submenu(set_menu);
     menu.add_action(Act::new("Quit", Event::Quit));
 
     let mut runner = Runner::new(menu);
@@ -216,8 +274,10 @@ pub fn run(mut data: Data) {
         if let Some(act) = runner.run("> ") {
             match act {
                 Event::AddClth => user_add_clth(&mut data),
-                Event::ListClths => println!("{}", data.clothes),
+                Event::ListClths => println!("{}", &data.clothes),
                 Event::UpdateClth => user_update_clth(&mut data),
+                Event::AddClthSet => user_add_clth_set(&mut data),
+                Event::ListClthSets => println!("{}", &data.clth_sets),
                 Event::Back => runner.back().unwrap(),
                 Event::Quit => break,
             }

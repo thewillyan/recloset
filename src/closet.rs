@@ -127,14 +127,12 @@ impl fmt::Display for Target {
 
 pub struct Style {
     pub name: String,
-    pub count: u32,
 }
 
 impl Style {
     pub fn new(name: &str) -> Style {
         Style {
-            name: String::from(name),
-            count: 0,
+            name: String::from(name)
         }
     }
 }
@@ -381,6 +379,50 @@ impl ClthSet {
 
     pub fn foot(&self) -> Weak<RefCell<Clth>> {
         Weak::clone(&self.foot)
+    }
+}
+
+impl fmt::Display for ClthSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let title = format!(
+            "_------------=[ {} ]=------------_",
+            self.lower.upgrade().unwrap().borrow().style.name.to_uppercase());
+
+        let body = [
+            self.upper.upgrade().unwrap().borrow().to_string(),
+            self.lower.upgrade().unwrap().borrow().to_string(),
+            self.foot.upgrade().unwrap().borrow().to_string(),
+        ].join("\n\n");
+
+        write!(f, "{}\n{}", title, body)
+    }
+}
+
+pub struct ClthSets {
+    list: Vec<ClthSet>
+}
+
+impl ClthSets {
+    pub fn new() -> ClthSets {
+        ClthSets { list: Vec::new() }
+    }
+
+    pub fn add(&mut self, set: ClthSet) {
+        self.list.push(set);
+    }
+}
+
+impl fmt::Display for ClthSets {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.list.is_empty() {
+            write!(f, "No sets to display!")
+        } else {
+            write!(f, "{}", self.list
+                .iter()
+                .map(|set| set.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"))
+        }
     }
 }
 
