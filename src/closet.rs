@@ -334,23 +334,23 @@ impl Styles {
     }
 }
 
-pub struct ClthSet {
-    upper: Weak<RefCell<Clth>>,
-    lower: Weak<RefCell<Clth>>,
-    foot: Weak<RefCell<Clth>>,
+pub struct Outfit {
+    pub chest: Weak<RefCell<Clth>>,
+    pub leg: Weak<RefCell<Clth>>,
+    pub foot: Weak<RefCell<Clth>>,
 }
 
-impl ClthSet {
+impl Outfit {
     pub fn new(
-        upper: Weak<RefCell<Clth>>,
-        lower: Weak<RefCell<Clth>>,
+        chest: Weak<RefCell<Clth>>,
+        leg: Weak<RefCell<Clth>>,
         foot: Weak<RefCell<Clth>>,
-    ) -> Result<ClthSet, &'static str> {
-        let up = upper.upgrade().unwrap();
+    ) -> Result<Outfit, &'static str> {
+        let up = chest.upgrade().unwrap();
         let up_stl = &up.borrow().style.name;
         let up_kind = &up.borrow().kind;
 
-        let low = lower.upgrade().unwrap();
+        let low = leg.upgrade().unwrap();
         let low_stl = &low.borrow().style.name;
         let low_kind = &low.borrow().kind;
 
@@ -363,34 +363,31 @@ impl ClthSet {
         }
 
         if let (Kind::Chest, Kind::Leg, Kind::Foot) = (&up_kind, &low_kind, &foot_kind) {
-            Ok(ClthSet { upper, lower, foot })
+            Ok(Outfit { chest, leg, foot })
         } else {
             Err("Invalid clothing set!")
         }
     }
 
-    pub fn upper(&self) -> Weak<RefCell<Clth>> {
-        Weak::clone(&self.upper)
-    }
-
-    pub fn lower(&self) -> Weak<RefCell<Clth>> {
-        Weak::clone(&self.lower)
-    }
-
-    pub fn foot(&self) -> Weak<RefCell<Clth>> {
-        Weak::clone(&self.foot)
+    pub fn to_clothes(&self) -> Clothes {
+        let list = vec![
+            self.chest.upgrade().unwrap(),
+            self.leg.upgrade().unwrap(),
+            self.foot.upgrade().unwrap(),
+        ];
+        Clothes { list }
     }
 }
 
-impl fmt::Display for ClthSet {
+impl fmt::Display for Outfit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let title = format!(
             "_------------=[ {} ]=------------_",
-            self.lower.upgrade().unwrap().borrow().style.name.to_uppercase());
+            self.leg.upgrade().unwrap().borrow().style.name.to_uppercase());
 
         let body = [
-            self.upper.upgrade().unwrap().borrow().to_string(),
-            self.lower.upgrade().unwrap().borrow().to_string(),
+            self.chest.upgrade().unwrap().borrow().to_string(),
+            self.leg.upgrade().unwrap().borrow().to_string(),
             self.foot.upgrade().unwrap().borrow().to_string(),
         ].join("\n\n");
 
@@ -398,21 +395,40 @@ impl fmt::Display for ClthSet {
     }
 }
 
-pub struct ClthSets {
-    list: Vec<ClthSet>
+pub struct Outfits {
+    list: Vec<Outfit>
 }
 
-impl ClthSets {
-    pub fn new() -> ClthSets {
-        ClthSets { list: Vec::new() }
+impl Outfits {
+    pub fn new() -> Outfits {
+        Outfits { list: Vec::new() }
     }
 
-    pub fn add(&mut self, set: ClthSet) {
+    pub fn add(&mut self, set: Outfit) {
         self.list.push(set);
     }
+
+    pub fn to_id_matrix(&self) -> Vec<[u32; 3]> {
+        self.list
+            .iter()
+            .map(|set| [
+                 set.chest.upgrade().unwrap().borrow().id,
+                 set.leg.upgrade().unwrap().borrow().id,
+                 set.foot.upgrade().unwrap().borrow().id,
+
+            ])
+            .collect::<Vec<_>>()
+    }
+
+    pub fn get(&self, ids: &[u32; 3]) -> Option<&Outfit> {
+        match self.to_id_matrix().binary_search(ids) {
+            Ok(index) => Some(&self.list[index]),
+            Err(_) => None
+        }
+    }
 }
 
-impl fmt::Display for ClthSets {
+impl fmt::Display for Outfits {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.list.is_empty() {
             write!(f, "No sets to display!")
@@ -467,13 +483,13 @@ mod tests {
             Rc::new(Style::new("style3")),
         )));
 
-        let set1 = ClthSet::new(
+        let set1 = Outfit::new(
             Rc::downgrade(&clth1),
             Rc::downgrade(&clth1),
             Rc::downgrade(&clth1),
         );
 
-        let set2 = ClthSet::new(
+        let set2 = Outfit::new(
             Rc::downgrade(&clth1),
             Rc::downgrade(&clth2),
             Rc::downgrade(&clth3),
@@ -518,7 +534,7 @@ mod tests {
             style,
         )));
 
-        assert!(ClthSet::new(
+        assert!(Outfit::new(
             Rc::downgrade(&clth1),
             Rc::downgrade(&clth2),
             Rc::downgrade(&clth3)

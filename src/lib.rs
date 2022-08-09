@@ -14,7 +14,7 @@ use input::InputErr;
 pub struct Data {
     pub clothes: Clothes,
     pub styles: Styles,
-    pub clth_sets: ClthSets,
+    pub outfits: Outfits,
     pub cache: TmpCache,
 }
 
@@ -23,7 +23,7 @@ impl Data {
         Data {
             clothes: Clothes::new(),
             styles: Styles::new(),
-            clth_sets: ClthSets::new(),
+            outfits: Outfits::new(),
             cache: TmpCache::new(),
         }
     }
@@ -157,7 +157,7 @@ pub fn user_update_clth(data: &mut Data) {
 
             if Rc::weak_count(&clth) != 0 {
                 eprintln!("Can't update the kind of a clothing that is in \
-                some clothing set.");
+                some outfit.");
                 return;
             }
 
@@ -190,7 +190,7 @@ pub fn user_update_clth(data: &mut Data) {
 
             if Rc::weak_count(&clth) != 0 {
                 eprintln!("Can't update the style of a clothing that is in \
-                some clothing set.");
+                some outfit.");
                 return;
             }
 
@@ -205,7 +205,7 @@ pub fn user_update_clth(data: &mut Data) {
     }
 }
 
-pub fn user_add_clth_set(data: &mut Data) {
+pub fn user_add_outfit(data: &mut Data) {
     let map = data.clothes.map_by_kind();
     let chests = map.get("chest").unwrap();
     let leggings = map.get("leg").unwrap();
@@ -229,13 +229,19 @@ pub fn user_add_clth_set(data: &mut Data) {
         None => return,
     };
 
-    let clth_set = ClthSet::new(
+    let ids = [ chest.borrow().id, leg.borrow().id, foot.borrow().id ];
+    if let Some(_) = data.outfits.get(&ids) {
+        eprintln!("This outfit already exists!");
+        return;
+    }
+
+    let outfit = Outfit::new(
         Rc::downgrade(&chest),
         Rc::downgrade(&leg),
         Rc::downgrade(&foot));
 
-    match clth_set {
-        Ok(set) => data.clth_sets.add(set),
+    match outfit {
+        Ok(set) => data.outfits.add(set),
         Err(msg) => eprintln!("Error while creating set: {}", msg),
     }
 }
@@ -258,9 +264,9 @@ pub fn run(mut data: Data) {
     clth_menu.add_action(Act::new("List clothes", Event::ListClths));
     clth_menu.add_action(Act::new("Back", Event::Back));
 
-    let mut set_menu = Menu::new("Sets");
-    set_menu.add_action(Act::new("Add set", Event::AddClthSet));
-    set_menu.add_action(Act::new("List sets", Event::ListClthSets));
+    let mut set_menu = Menu::new("Outfits");
+    set_menu.add_action(Act::new("Add outfit", Event::AddClthSet));
+    set_menu.add_action(Act::new("List outfits", Event::ListClthSets));
     set_menu.add_action(Act::new("Back", Event::Back));
 
     let mut menu = Menu::new("root");
@@ -274,10 +280,10 @@ pub fn run(mut data: Data) {
         if let Some(act) = runner.run("> ") {
             match act {
                 Event::AddClth => user_add_clth(&mut data),
-                Event::ListClths => println!("{}", &data.clothes),
+                Event::ListClths => println!("{}\n", &data.clothes),
                 Event::UpdateClth => user_update_clth(&mut data),
-                Event::AddClthSet => user_add_clth_set(&mut data),
-                Event::ListClthSets => println!("{}", &data.clth_sets),
+                Event::AddClthSet => user_add_outfit(&mut data),
+                Event::ListClthSets => println!("{}\n", &data.outfits),
                 Event::Back => runner.back().unwrap(),
                 Event::Quit => break,
             }
