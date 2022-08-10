@@ -139,6 +139,15 @@ pub fn user_add_clth(data: &mut Data) {
     }
 }
 
+pub fn user_rm_clth(data: &mut Data) {
+    println!("{}", data.clothes);
+    let clth = match InputErr::until_ok(|| input::select_clth(&data.clothes)) {
+        Some(value) => value,
+        None => return,
+    };
+    data.clothes.remove(clth.borrow().id).unwrap();
+}
+
 pub fn user_update_clth(data: &mut Data) {
     println!("{}\n", data.clothes);
     let clth = InputErr::until_ok(|| input::select_clth(&data.clothes));
@@ -249,10 +258,11 @@ pub fn user_add_outfit(data: &mut Data) {
 #[derive(Clone)]
 pub enum Event {
     AddClth,
+    RemoveClth,
     ListClths,
     UpdateClth,
-    AddClthSet,
-    ListClthSets,
+    AddOutfit,
+    ListOutfits,
     Back,
     Quit,
 }
@@ -260,18 +270,19 @@ pub enum Event {
 pub fn run(mut data: Data) {
     let mut clth_menu = Menu::new("Clothes");
     clth_menu.add_action(Act::new("Add clothing", Event::AddClth));
+    clth_menu.add_action(Act::new("Remove clothing", Event::RemoveClth));
     clth_menu.add_action(Act::new("Update clothing", Event::UpdateClth));
     clth_menu.add_action(Act::new("List clothes", Event::ListClths));
     clth_menu.add_action(Act::new("Back", Event::Back));
 
-    let mut set_menu = Menu::new("Outfits");
-    set_menu.add_action(Act::new("Add outfit", Event::AddClthSet));
-    set_menu.add_action(Act::new("List outfits", Event::ListClthSets));
-    set_menu.add_action(Act::new("Back", Event::Back));
+    let mut outfit_menu = Menu::new("Outfits");
+    outfit_menu.add_action(Act::new("Add outfit", Event::AddOutfit));
+    outfit_menu.add_action(Act::new("List outfits", Event::ListOutfits));
+    outfit_menu.add_action(Act::new("Back", Event::Back));
 
     let mut menu = Menu::new("root");
     menu.add_submenu(clth_menu);
-    menu.add_submenu(set_menu);
+    menu.add_submenu(outfit_menu);
     menu.add_action(Act::new("Quit", Event::Quit));
 
     let mut runner = Runner::new(menu);
@@ -280,10 +291,11 @@ pub fn run(mut data: Data) {
         if let Some(act) = runner.run("> ") {
             match act {
                 Event::AddClth => user_add_clth(&mut data),
+                Event::RemoveClth => user_rm_clth(&mut data),
                 Event::ListClths => println!("{}\n", &data.clothes),
                 Event::UpdateClth => user_update_clth(&mut data),
-                Event::AddClthSet => user_add_outfit(&mut data),
-                Event::ListClthSets => println!("{}\n", &data.outfits),
+                Event::AddOutfit => user_add_outfit(&mut data),
+                Event::ListOutfits => println!("{}\n", &data.outfits),
                 Event::Back => runner.back().unwrap(),
                 Event::Quit => break,
             }

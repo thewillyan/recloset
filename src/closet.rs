@@ -160,6 +160,22 @@ impl Clothes {
         self.list.push(Rc::new(RefCell::new(clth)));
     }
 
+    pub fn remove(&mut self, id: u32) -> Result<Rc<RefCell<Clth>>, &'static str> {
+        let mut elements = self.list.iter().enumerate();
+        let (index, clth) = loop {
+            match elements.next() {
+                Some(el) if el.1.borrow().id == id => {
+                    break (el.0, Rc::clone(el.1));
+                }
+                None => return Err("Clothing not found."),
+                _ => (),
+            }
+        };
+
+        self.list.remove(index);
+        Ok(clth)
+    }
+
     pub fn request_id(&self) -> u32 {
         let ids: Vec<u32> = self.list.iter().map(|clth| clth.borrow().id).collect();
         let mut new_id = 0;
@@ -377,13 +393,19 @@ impl Outfit {
         ];
         Clothes { list }
     }
+
+    pub fn to_id_arr(&self) -> [u32; 3] {
+        [
+            self.chest.upgrade().unwrap().borrow().id,
+            self.leg.upgrade().unwrap().borrow().id,
+            self.foot.upgrade().unwrap().borrow().id,
+        ]
+    }
 }
 
 impl fmt::Display for Outfit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let title = format!(
-            "_------------=[ {} ]=------------_",
-            self.leg.upgrade().unwrap().borrow().style.name.to_uppercase());
+        let title = "]-------------=[]=------------[";
 
         let body = [
             self.chest.upgrade().unwrap().borrow().to_string(),
@@ -411,12 +433,7 @@ impl Outfits {
     pub fn to_id_matrix(&self) -> Vec<[u32; 3]> {
         self.list
             .iter()
-            .map(|set| [
-                 set.chest.upgrade().unwrap().borrow().id,
-                 set.leg.upgrade().unwrap().borrow().id,
-                 set.foot.upgrade().unwrap().borrow().id,
-
-            ])
+            .map(|set| set.to_id_arr())
             .collect::<Vec<_>>()
     }
 
