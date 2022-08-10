@@ -1,4 +1,4 @@
-use crate::closet::{ Clth, Clothes, Kind, Sex, Size, Target, Rgb };
+use crate::closet::{ Clth, Clothes, Kind, Sex, Size, Target, Rgb, Outfits, Outfit };
 use std::process;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -205,7 +205,7 @@ pub fn select_clth(clothes: &Clothes) -> Result<Rc<RefCell<Clth>>, InputErr> {
         })
     }
 
-    let input = read_not_empty("Select a id: ").to_lowercase();
+    let input = read_not_empty("Select a clothing id: ").to_lowercase();
 
     if input == "exit" {
         return Err(InputErr::user_abort());
@@ -230,5 +230,30 @@ pub fn select_clth_field() -> Result<String, InputErr> {
     match sel_index {
         0..=5 => Ok(fields[sel_index].to_lowercase()),
         _ => Err(InputErr::user_abort()),
+    }
+}
+
+pub fn select_outfit(outfits: &Outfits) -> Result<&Outfit, InputErr> {
+    if outfits.list.is_empty() {
+        return Err(InputErr {
+            class: ErrType::Abort,
+            msg: String::from("No outfits to choose from.")
+        })
+    }
+
+    let input = read_not_empty("Select a outfit id: ").to_lowercase();
+
+    if input == "exit" {
+        return Err(InputErr::user_abort());
+    }
+
+    let id: u32 = match input.parse() {
+        Ok(id) => id,
+        Err(_) => return Err(InputErr::wrong("Invalid number!")),
+    };
+
+    match outfits.get(id) {
+        Some(outfit) => Ok(outfit),
+        None => Err(InputErr::wrong("Invalid id!")),
     }
 }

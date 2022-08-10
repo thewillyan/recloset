@@ -239,12 +239,13 @@ pub fn user_add_outfit(data: &mut Data) {
     };
 
     let ids = [ chest.borrow().id, leg.borrow().id, foot.borrow().id ];
-    if let Some(_) = data.outfits.get(&ids) {
+    if data.outfits.to_id_matrix().contains(&ids) {
         eprintln!("This outfit already exists!");
         return;
     }
 
     let outfit = Outfit::new(
+        data.outfits.request_id(),
         Rc::downgrade(&chest),
         Rc::downgrade(&leg),
         Rc::downgrade(&foot));
@@ -255,6 +256,15 @@ pub fn user_add_outfit(data: &mut Data) {
     }
 }
 
+pub fn user_rm_outfit(data: &mut Data) {
+    let outfit = match InputErr::until_ok(|| input::select_outfit(&data.outfits)) {
+        Some(outfit) => outfit,
+        None => return,
+    };
+
+    data.outfits.remove(outfit.id).unwrap();
+}
+
 #[derive(Clone)]
 pub enum Event {
     AddClth,
@@ -262,6 +272,7 @@ pub enum Event {
     ListClths,
     UpdateClth,
     AddOutfit,
+    RemoveOutfit,
     ListOutfits,
     Back,
     Quit,
@@ -277,6 +288,7 @@ pub fn run(mut data: Data) {
 
     let mut outfit_menu = Menu::new("Outfits");
     outfit_menu.add_action(Act::new("Add outfit", Event::AddOutfit));
+    outfit_menu.add_action(Act::new("Remove outfit", Event::RemoveOutfit));
     outfit_menu.add_action(Act::new("List outfits", Event::ListOutfits));
     outfit_menu.add_action(Act::new("Back", Event::Back));
 
@@ -295,6 +307,7 @@ pub fn run(mut data: Data) {
                 Event::ListClths => println!("{}\n", &data.clothes),
                 Event::UpdateClth => user_update_clth(&mut data),
                 Event::AddOutfit => user_add_outfit(&mut data),
+                Event::RemoveOutfit => user_rm_outfit(&mut data),
                 Event::ListOutfits => println!("{}\n", &data.outfits),
                 Event::Back => runner.back().unwrap(),
                 Event::Quit => break,

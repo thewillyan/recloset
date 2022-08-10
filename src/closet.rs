@@ -161,19 +161,16 @@ impl Clothes {
     }
 
     pub fn remove(&mut self, id: u32) -> Result<Rc<RefCell<Clth>>, &'static str> {
-        let mut elements = self.list.iter().enumerate();
-        let (index, clth) = loop {
-            match elements.next() {
-                Some(el) if el.1.borrow().id == id => {
-                    break (el.0, Rc::clone(el.1));
-                }
-                None => return Err("Clothing not found."),
-                _ => (),
-            }
-        };
+        let index = match self.list
+            .iter()
+            .map(|el| el.borrow().id)
+            .collect::<Vec<_>>()
+            .binary_search(&id) {
+                Ok(index) => index,
+                Err(_) => return Err("Clothing not found."),
+            };
 
-        self.list.remove(index);
-        Ok(clth)
+        Ok(self.list.swap_remove(index))
     }
 
     pub fn request_id(&self) -> u32 {
@@ -351,6 +348,7 @@ impl Styles {
 }
 
 pub struct Outfit {
+    pub id: u32,
     pub chest: Weak<RefCell<Clth>>,
     pub leg: Weak<RefCell<Clth>>,
     pub foot: Weak<RefCell<Clth>>,
@@ -358,6 +356,7 @@ pub struct Outfit {
 
 impl Outfit {
     pub fn new(
+        id: u32,
         chest: Weak<RefCell<Clth>>,
         leg: Weak<RefCell<Clth>>,
         foot: Weak<RefCell<Clth>>,
@@ -379,7 +378,7 @@ impl Outfit {
         }
 
         if let (Kind::Chest, Kind::Leg, Kind::Foot) = (&up_kind, &low_kind, &foot_kind) {
-            Ok(Outfit { chest, leg, foot })
+            Ok(Outfit { id, chest, leg, foot })
         } else {
             Err("Invalid clothing set!")
         }
@@ -405,7 +404,7 @@ impl Outfit {
 
 impl fmt::Display for Outfit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let title = "]-------------=[]=------------[";
+        let title = format!("-> Outfit {}", self.id);
 
         let body = [
             self.chest.upgrade().unwrap().borrow().to_string(),
@@ -418,7 +417,7 @@ impl fmt::Display for Outfit {
 }
 
 pub struct Outfits {
-    list: Vec<Outfit>
+    pub list: Vec<Outfit>
 }
 
 impl Outfits {
@@ -430,6 +429,19 @@ impl Outfits {
         self.list.push(set);
     }
 
+    pub fn remove(&mut self, id: u32) -> Result<Outfit, &'static str> {
+        let index = match self.list
+            .iter()
+            .map(|el| el.id)
+            .collect::<Vec<_>>()
+            .binary_search(&id) {
+                Ok(index) => index,
+                Err(_) => return Err("Clothing not found."),
+            };
+
+        Ok(self.list.swap_remove(index))
+    }
+
     pub fn to_id_matrix(&self) -> Vec<[u32; 3]> {
         self.list
             .iter()
@@ -437,18 +449,30 @@ impl Outfits {
             .collect::<Vec<_>>()
     }
 
-    pub fn get(&self, ids: &[u32; 3]) -> Option<&Outfit> {
-        match self.to_id_matrix().binary_search(ids) {
-            Ok(index) => Some(&self.list[index]),
-            Err(_) => None
+    pub fn get(&self, id: u32) -> Option<&Outfit> {
+        for outfit in self.list.iter() {
+            if outfit.id == id {
+                return Some(outfit);
+            }
         }
+        None
     }
+
+    pub fn request_id(&self) -> u32 {
+        let ids: Vec<u32> = self.list.iter().map(|outfit| outfit.id).collect();
+        let mut new_id = 0;
+        while ids.contains(&new_id) {
+            new_id += 1
+        }
+        new_id
+    }
+
 }
 
 impl fmt::Display for Outfits {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.list.is_empty() {
-            write!(f, "No sets to display!")
+            write!(f, "No outfits to display!")
         } else {
             write!(f, "{}", self.list
                 .iter()
@@ -501,12 +525,14 @@ mod tests {
         )));
 
         let set1 = Outfit::new(
+            0,
             Rc::downgrade(&clth1),
             Rc::downgrade(&clth1),
             Rc::downgrade(&clth1),
         );
 
         let set2 = Outfit::new(
+            1,
             Rc::downgrade(&clth1),
             Rc::downgrade(&clth2),
             Rc::downgrade(&clth3),
@@ -552,10 +578,10 @@ mod tests {
         )));
 
         assert!(Outfit::new(
-            Rc::downgrade(&clth1),
-            Rc::downgrade(&clth2),
-            Rc::downgrade(&clth3)
-        )
+                0,
+                Rc::downgrade(&clth1),
+                Rc::downgrade(&clth2),
+                Rc::downgrade(&clth3))
         .is_ok());
     }
 
