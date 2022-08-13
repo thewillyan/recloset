@@ -4,6 +4,8 @@ use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+type ErrMsg = &'static str;
+
 pub struct Clth {
     pub id: u32,
     pub kind: Kind,
@@ -153,11 +155,12 @@ impl Clothes {
         })
     }
 
-    pub fn add(&mut self, clth: Clth) {
+    pub fn add(&mut self, clth: Clth) -> Option<ErrMsg> {
         if let Some(_) = self.get(clth.id) {
-            panic!("A clothing with the same id already exists in 'Clothes'");
+            return Some("A clothing with the same id already exists in 'Clothes'");
         }
         self.list.push(Rc::new(RefCell::new(clth)));
+        None
     }
 
     pub fn remove(&mut self, id: u32) -> Result<Rc<RefCell<Clth>>, &'static str> {
@@ -189,45 +192,6 @@ impl Clothes {
             }
         }
         None
-    }
-
-    pub fn filter_by_kind(&self, kind: Kind) -> Clothes {
-        let filtered = self
-            .list
-            .iter()
-            .fold(Vec::new(), |mut acc, clth| {
-                if clth.borrow().kind == kind {
-                    acc.push(Rc::clone(clth));
-                }
-                acc
-            });
-        Clothes { list: filtered }
-    }
-
-    pub fn filter_by_sex(&self, sex: Sex) -> Clothes {
-        let filtered = self
-            .list
-            .iter()
-            .fold(Vec::new(), |mut acc, clth| {
-                if clth.borrow().sex == sex {
-                    acc.push(Rc::clone(clth));
-                }
-                acc
-            });
-        Clothes { list: filtered }
-    }
-
-    pub fn filter_by_size(&self, size: Size) -> Clothes {
-        let filtered = self
-            .list
-            .iter()
-            .fold(Vec::new(), |mut acc, clth| {
-                if clth.borrow().size == size {
-                    acc.push(Rc::clone(clth));
-                }
-                acc
-            });
-        Clothes { list: filtered }
     }
 
     pub fn filter_by_color(&self, color: Rgb) -> Clothes {
@@ -400,11 +364,16 @@ impl Outfit {
             self.foot.upgrade().unwrap().borrow().id,
         ]
     }
+
+    pub fn is_valid(&self) -> bool {
+        self.chest.upgrade().is_some() && self.leg.upgrade().is_some() &&
+            self.foot.upgrade().is_some()
+    }
 }
 
 impl fmt::Display for Outfit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let title = format!("-> Outfit {}", self.id);
+        let title = format!("[ Outfit {} ]", self.id);
 
         let body = [
             self.chest.upgrade().unwrap().borrow().to_string(),
@@ -416,6 +385,7 @@ impl fmt::Display for Outfit {
     }
 }
 
+
 pub struct Outfits {
     pub list: Vec<Outfit>
 }
@@ -425,8 +395,12 @@ impl Outfits {
         Outfits { list: Vec::new() }
     }
 
-    pub fn add(&mut self, set: Outfit) {
-        self.list.push(set);
+    pub fn add(&mut self, outfit: Outfit) -> Option<ErrMsg> {
+        if self.to_id_matrix().contains(&outfit.to_id_arr()) {
+            return Some("This outfit already exists!");
+        }
+        self.list.push(outfit);
+        None
     }
 
     pub fn remove(&mut self, id: u32) -> Result<Outfit, &'static str> {
@@ -467,6 +441,15 @@ impl Outfits {
         new_id
     }
 
+    pub fn clean(&mut self) {
+        let black_list: Vec<_> = self.list
+            .iter()
+            .filter(|el| !el.is_valid())
+            .map(|el| el.id)
+            .collect();
+
+        black_list.iter().for_each(|id| { self.remove(*id).unwrap(); });
+    }
 }
 
 impl fmt::Display for Outfits {

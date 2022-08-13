@@ -134,6 +134,7 @@ pub fn user_add_clth(data: &mut Data) {
             let date = Local::today().naive_local();
             let new_clth = buffer.to_clth(id, date, stl);
             data.clothes.add(new_clth);
+            println!("Clothing has been added.\n");
         },
         Err((buffer, _)) => data.cache.clth = Some(buffer),
     }
@@ -220,39 +221,46 @@ pub fn user_add_outfit(data: &mut Data) {
     let leggings = map.get("leg").unwrap();
     let footwears = map.get("foot").unwrap();
 
-    println!("\n{}", chests);
+    let separator = ">-<".repeat(10);
+
+    println!("{}", chests);
     let chest = match InputErr::until_ok(|| input::select_clth(chests)) {
         Some(clth) => clth,
         None => return,
     };
+    println!("{}", separator);
 
-    println!("\n{}", leggings);
+    println!("{}", leggings);
     let leg = match InputErr::until_ok(|| input::select_clth(leggings)) {
         Some(clth) => clth,
         None => return,
     };
+    println!("{}", separator);
 
-    println!("\n{}", footwears);
+    println!("{}", footwears);
     let foot = match InputErr::until_ok(|| input::select_clth(footwears)) {
         Some(clth) => clth,
         None => return,
     };
 
-    let ids = [ chest.borrow().id, leg.borrow().id, foot.borrow().id ];
-    if data.outfits.to_id_matrix().contains(&ids) {
-        eprintln!("This outfit already exists!");
-        return;
-    }
-
     let outfit = Outfit::new(
         data.outfits.request_id(),
         Rc::downgrade(&chest),
         Rc::downgrade(&leg),
-        Rc::downgrade(&foot));
+        Rc::downgrade(&foot)
+    );
 
-    match outfit {
+    let result = match outfit {
         Ok(set) => data.outfits.add(set),
-        Err(msg) => eprintln!("Error while creating set: {}", msg),
+        Err(msg) => {
+            eprintln!("Error while creating outfit: {}", msg);
+            return;
+        },
+    };
+
+    match result {
+        Some(err) => eprintln!("Error while adding outfit: {}", err),
+        None => println!("Oufit has been added.\n")
     }
 }
 
@@ -303,7 +311,10 @@ pub fn run(mut data: Data) {
         if let Some(act) = runner.run("> ") {
             match act {
                 Event::AddClth => user_add_clth(&mut data),
-                Event::RemoveClth => user_rm_clth(&mut data),
+                Event::RemoveClth => {
+                    user_rm_clth(&mut data);
+                    data.outfits.clean();
+                },
                 Event::ListClths => println!("{}\n", &data.clothes),
                 Event::UpdateClth => user_update_clth(&mut data),
                 Event::AddOutfit => user_add_outfit(&mut data),
