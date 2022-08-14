@@ -1,6 +1,7 @@
 pub mod closet;
 pub mod menu;
 pub mod input;
+pub mod storage;
 
 // external
 use std::rc::Rc;

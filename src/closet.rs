@@ -4,7 +4,7 @@ use std::rc::{Rc, Weak};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-type ErrMsg = &'static str;
+pub type ErrMsg = &'static str;
 
 pub struct Clth {
     pub id: u32,
