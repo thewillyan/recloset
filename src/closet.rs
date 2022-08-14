@@ -45,9 +45,9 @@ impl fmt::Display for Clth {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut fields = Vec::with_capacity(8);
         fields.push(format!("Id: {}", self.id));
-        fields.push(format!("Kind: {:?}", self.kind));
-        fields.push(format!("Sex: {:?}", self.sex));
-        fields.push(format!("Size: {:?}", self.size));
+        fields.push(format!("Kind: {}", self.kind));
+        fields.push(format!("Sex: {}", self.sex));
+        fields.push(format!("Size: {}", self.size));
         fields.push(format!("Color: {}", self.color));
         fields.push(format!("Target: {}", self.target));
         fields.push(format!("Purchase date: {}", self.purchase_date));
@@ -63,11 +63,47 @@ pub enum Kind {
     Foot,
 }
 
+impl Kind {
+    pub fn from_str(value: &str) -> Result<Kind, ErrMsg> {
+        let kind = match value.to_lowercase().as_str() {
+            "chest" => Kind::Chest,
+            "leg" => Kind::Leg,
+            "foot" => Kind::Foot,
+            _ => return Err("Invalid kind.")
+        };
+        Ok(kind)
+    }
+}
+
+impl fmt::Display for Kind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sex {
     Male,
     Female,
     Unissex,
+}
+
+impl Sex {
+    pub fn from_str(value: &str) -> Result<Sex, ErrMsg> {
+        let sex = match value.to_lowercase().as_str() {
+            "male" => Sex::Male,
+            "female" => Sex::Female,
+            "unissex" => Sex::Unissex,
+            _ => return Err("Invalid sex.")
+        };
+        Ok(sex)
+    }
+}
+
+impl fmt::Display for Sex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,6 +113,26 @@ pub enum Size {
     M,
     L,
     XL,
+}
+
+impl Size {
+    pub fn from_str(value: &str) -> Result<Size, ErrMsg> {
+        let size = match value.to_lowercase().as_str() {
+            "xs" => Size::XS,
+            "s" => Size::S,
+            "m" => Size::M,
+            "l" => Size::L,
+            "xl" => Size::XL,
+            _ => return Err("Invalid size.")
+        };
+        Ok(size)
+    }
+}
+
+impl fmt::Display for Size {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -102,11 +158,15 @@ impl Rgb {
 
         Some(Rgb::new(bytes[0], bytes[1], bytes[2]))
     }
+    
+    pub fn to_hex(&self) -> String {
+        format!("{:02X}{:02X}{:02X}", self.0, self.1, self.2)
+    }
 }
 
 impl fmt::Display for Rgb {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "rgb({}, {}, {})", self.0, self.1, self.2)
+        write!(f, "#{}", self.to_hex())
     }
 }
 
@@ -115,6 +175,25 @@ pub enum Target {
     Sale(u64),
     Donation,
     Keep,
+}
+
+impl Target {
+    pub fn from_str(value: &str) -> Result<Target, ErrMsg> {
+        let value = value.to_lowercase();
+        let target = match value.split_once('$') {
+            Some(("sale for ", price)) => {
+                let price: u64 = match price.parse(){
+                    Ok(num) => num,
+                    Err(_) => return Err("Invalid price."),
+                };
+                Target::Sale(price)
+            },
+            None if value == "donation" => Target::Donation,
+            None if value == "keep" => Target::Keep,
+            _ => return Err("Invalid target.")
+        };
+        Ok(target)
+    }
 }
 
 impl fmt::Display for Target {
@@ -579,5 +658,70 @@ mod tests {
     #[test]
     pub fn reject_invalid_color() {
         assert!(Rgb::try_from_hex("FFFFFZ").is_none());
+    }
+
+    #[test]
+    pub fn color_to_hex() {
+        assert_eq!("FFFFFF", Rgb(255,255,255).to_hex());
+    }
+
+    #[test]
+    pub fn kind_from_str() {
+        assert!(
+            matches!(Kind::from_str("Chest").unwrap(), Kind::Chest)
+        );
+        assert!(
+            matches!(Kind::from_str("Leg").unwrap(), Kind::Leg)
+        );
+        assert!(
+            matches!(Kind::from_str("Foot").unwrap(), Kind::Foot)
+        );
+    }
+
+    #[test]
+    pub fn sex_from_str() {
+        assert!(
+            matches!(Sex::from_str("Male").unwrap(), Sex::Male)
+        );
+        assert!(
+            matches!(Sex::from_str("Female").unwrap(), Sex::Female)
+        );
+        assert!(
+            matches!(Sex::from_str("Unissex").unwrap(), Sex::Unissex)
+        );
+    }
+
+    #[test]
+    pub fn size_from_str() {
+        assert!(Size::from_str("invalid").is_err());
+        assert!(
+            matches!(Size::from_str("xs").unwrap(), Size::XS)
+        );
+        assert!(
+            matches!(Size::from_str("s").unwrap(), Size::S)
+        );
+        assert!(
+            matches!(Size::from_str("m").unwrap(), Size::M)
+        );
+        assert!(
+            matches!(Size::from_str("l").unwrap(), Size::L)
+        );
+        assert!(
+            matches!(Size::from_str("xl").unwrap(), Size::XL)
+        );
+    }
+
+    #[test]
+    pub fn target_from_str() {
+        assert!(Target::from_str("invalid").is_err());
+        assert!(
+            matches!(Target::from_str("Sale for $10").unwrap(), Target::Sale(10)) 
+        );
+        assert!(
+            matches!(Target::from_str("Donation").unwrap(), Target::Donation) 
+        );
+        assert!(
+            matches!(Target::from_str("Keep").unwrap(), Target::Keep) 
+        );
     }
 }
