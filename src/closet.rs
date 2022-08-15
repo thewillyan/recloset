@@ -182,11 +182,12 @@ impl Target {
         let value = value.to_lowercase();
         let target = match value.split_once('$') {
             Some(("sale for ", price)) => {
-                let price: u64 = match price.parse(){
+                let price: f64 = match price.parse(){
                     Ok(num) => num,
                     Err(_) => return Err("Invalid price."),
                 };
-                Target::Sale(price)
+                let cents = (price * 100.0).trunc() as u64;
+                Target::Sale(cents)
             },
             None if value == "donation" => Target::Donation,
             None if value == "keep" => Target::Keep,
@@ -715,7 +716,7 @@ mod tests {
     pub fn target_from_str() {
         assert!(Target::from_str("invalid").is_err());
         assert!(
-            matches!(Target::from_str("Sale for $10").unwrap(), Target::Sale(10)) 
+            matches!(Target::from_str("Sale for $10.00").unwrap(), Target::Sale(1000))
         );
         assert!(
             matches!(Target::from_str("Donation").unwrap(), Target::Donation) 

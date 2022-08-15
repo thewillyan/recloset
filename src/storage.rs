@@ -1,7 +1,13 @@
-//const FILE: &str = "data.toml";
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::rc::Rc;
+use chrono::NaiveDate;
 
+use crate::Data;
+use crate::closet::{ Kind, Sex, Size, Rgb, Target};
+use crate::closet::{ Clth, Clothes, Outfits, Outfit, Styles };
+
+#[derive(Debug)]
 pub struct ParseError {
     pub line: u32,
     pub msg: String,
@@ -46,6 +52,156 @@ impl FileData {
             }
         }
         Ok(fdata)
+    }
+
+    pub fn extract_clths(&self) -> Result<(Clothes, Styles), &'static str> {
+        let mut clothes = Clothes::new();
+        let mut styles = Styles::new();
+
+        for chunk in &self.clth_chunks {
+            let id = match chunk.fields.get("id") {
+                Some(Value::Num(num)) => *num as u32,
+                Some(_) => return Err("'id' is not a text field."),
+                None => return Err("Missing 'id' field."),
+            };
+
+            let kind = match chunk.fields.get("kind") {
+                Some(Value::Text(value)) => Kind::from_str(value),
+                Some(_) => return Err("'kind' is not a numerical field."),
+                None => return Err("Missing 'kind' field."),
+            };
+
+            let kind = match kind {
+                Ok(value) => value,
+                Err(msg) => return Err(msg),
+            };
+
+            let sex = match chunk.fields.get("sex") {
+                Some(Value::Text(value)) => Sex::from_str(value),
+                Some(_) => return Err("'sex' is not a numerical field."),
+                None => return Err("Missing 'sex' field."),
+            };
+
+            let sex = match sex {
+                Ok(value) => value,
+                Err(msg) => return Err(msg),
+            };
+
+            let size = match chunk.fields.get("size") {
+                Some(Value::Text(value)) => Size::from_str(value),
+                Some(_) => return Err("'size' is not a numerical field."),
+                None => return Err("Missing 'size' field."),
+            };
+
+            let size = match size {
+                Ok(value) => value,
+                Err(msg) => return Err(msg),
+            };
+
+            let color = match chunk.fields.get("color") {
+                Some(Value::Text(value)) => Rgb::try_from_hex(value),
+                Some(_) => return Err("'color' is not a numerical field."),
+                None => return Err("Missing 'color' field."),
+            };
+
+            let color = match color {
+                Some(color) => color,
+                None => return Err("Invalid color."),
+            };
+
+            let target = match chunk.fields.get("target") {
+                Some(Value::Text(value)) => Target::from_str(value),
+                Some(_) => return Err("'target' is not a numerical field."),
+                None => return Err("Missing 'target' field."),
+            };
+
+            let target = match target {
+                Ok(value) => value,
+                Err(msg) => return Err(msg) ,
+            };
+
+            let purchase_date = match chunk.fields.get("purchase_date") {
+                Some(Value::Text(value)) => {
+                    NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                },
+                Some(_) => return Err("'purchase_date' is not a numerical field."),
+                None => return Err("Missing 'purchase_date' field."),
+            };
+
+            let purchase_date = match purchase_date {
+                Ok(date) => date,
+                Err(_) => return Err("Invalid date."),
+            };
+
+            let stl_name = match chunk.fields.get("style") {
+                Some(Value::Text(name)) => name,
+                Some(_) => return Err("'style' is not a numerical field."),
+                None => return Err("Missing 'style' field."),
+            };
+            let style = styles.get_or_add(&stl_name);
+
+            clothes.add(
+                Clth::new(id, kind, sex, size, color, target, purchase_date, style)
+            );
+        }
+        Ok((clothes, styles))
+    }
+
+    pub fn extract_outfits(&self, clothes: &Clothes) -> Result<Outfits, &'static str> {
+        let mut outfits = Outfits::new();
+
+        for chunk in &self.outfit_chunks {
+            let chest_id = match chunk.fields.get("chest") {
+                Some(Value::Num(num)) => *num as u32,
+                Some(_) => return Err("'chest' is not a text field."),
+                None => return Err("Missing 'chest' field."),
+            };
+            let chest = match clothes.get(chest_id) {
+                Some(rc) => Rc::downgrade(rc),
+                None => return Err("Invalid 'chest' id."),
+            };
+
+            let leg_id = match chunk.fields.get("leg") {
+                Some(Value::Num(num)) => *num as u32,
+                Some(_) => return Err("'leg' is not a text field."),
+                None => return Err("Missing 'leg' field."),
+            };
+            let leg = match clothes.get(leg_id) {
+                Some(rc) => Rc::downgrade(rc),
+                None => return Err("Invalid 'leg' id."),
+            };
+
+            let foot_id = match chunk.fields.get("foot") {
+                Some(Value::Num(num)) => *num as u32,
+                Some(_) => return Err("'foot' is not a text field."),
+                None => return Err("Missing 'foot' field."),
+            };
+            let foot = match clothes.get(foot_id) {
+                Some(rc) => Rc::downgrade(rc),
+                None => return Err("Invalid 'foot' id."),
+            };
+
+            let outfit = match Outfit::new(outfits.request_id(), chest, leg, foot) {
+                Ok(value) => value,
+                Err(msg) => return Err(msg),
+            };
+            outfits.add(outfit);
+        }
+        Ok(outfits)
+    }
+
+    pub fn to_data(&self) -> Result<Data, &'static str> {
+        let (clothes, styles) = match self.extract_clths() {
+            Ok(values) => values,
+            Err(msg) => return Err(msg),
+        };
+
+        let outfits = match self.extract_outfits(&clothes) {
+            Ok(value) => value,
+            Err(msg) => return Err(msg),
+        };
+
+        Ok(Data { clothes, styles, outfits, ..Data::new() })
     }
 }
 
@@ -137,6 +293,47 @@ pub mod tests {
     const TEXT1: &str = "[clth]\n id   = 2\nkind = \"chest\"";
     const TEXT2: &str = "[outfit]\nchest = 1\nleg = 3\n";
 
+    const CLTH1: &str = "
+        [clth]
+        id = 0
+        kind = \"chest\"
+        sex = \"male\"
+        size = \"L\"
+        color = \"FF00EE\"
+        target= \"Sale for $20.75\"
+        purchase_date = \"2022-08-15\"
+        style = \"summer\"
+    ";
+    const CLTH2: &str = "
+        [clth]
+        id = 1
+        kind = \"foot\"
+        sex = \"male\"
+        size = \"M\"
+        color = \"FF00EE\"
+        target= \"Sale for $20.75\"
+        purchase_date = \"2022-08-15\"
+        style = \"summer\"
+    ";
+    const CLTH3: &str = "
+        [clth]
+        id = 2
+        kind = \"leg\"
+        sex = \"male\"
+        size = \"M\"
+        color = \"FF00EE\"
+        target= \"Sale for $20.75\"
+        purchase_date = \"2022-08-15\"
+        style = \"summer\"
+    ";
+
+    const OUTFIT: &str = "
+        [outfit]
+        chest = 0
+        leg = 2
+        foot = 1
+    ";
+
     #[test]
     pub fn text_to_datachunk() {
         let result = match super::parse(TEXT1) {
@@ -168,5 +365,29 @@ pub mod tests {
         };
         assert_eq!(1, file_data.clth_chunks.len());
         assert_eq!(1, file_data.outfit_chunks.len());
+    }
+
+    #[test]
+    pub fn create_clths() {
+        let text = [CLTH1, CLTH2, CLTH3].join("\n\n");
+        let fdata = FileData::from(&text).unwrap();
+        assert_eq!(3, fdata.clth_chunks.len());
+        assert_eq!(0, fdata.outfit_chunks.len());
+
+        let (clths, stls) = fdata.extract_clths().unwrap();
+        assert!(
+            clths.get(0).is_some() && clths.get(1).is_some() &&
+            clths.get(2).is_some());
+        assert!(stls.get("summer").is_some());
+    }
+
+    #[test]
+    pub fn create_outfits() {
+        let text = [CLTH1, CLTH2, CLTH3, OUTFIT].join("\n\n");
+        let fdata = FileData::from(&text).unwrap();
+
+        let (clths, _) = fdata.extract_clths().unwrap();
+        let outfits = fdata.extract_outfits(&clths).unwrap();
+        assert_eq!(vec![ [0,2,1] ], outfits.to_id_matrix());
     }
 }
