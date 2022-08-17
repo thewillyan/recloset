@@ -39,6 +39,19 @@ impl Clth {
             style,
         }
     }
+
+    pub fn to_toml(&self) -> String {
+        let mut result = String::from("[clth]\n");
+        result.push_str(&format!("id = {}\n", self.id));
+        result.push_str(&format!("kind = \"{}\"\n", self.kind));
+        result.push_str(&format!("sex = \"{}\"\n", self.sex));
+        result.push_str(&format!("size = \"{}\"\n", self.size));
+        result.push_str(&format!("color = \"{}\"\n", self.color.to_hex()));
+        result.push_str(&format!("target = \"{}\"\n", self.target));
+        result.push_str(&format!("purchase_date = \"{}\"\n", self.purchase_date));
+        result.push_str(&format!("style = \"{}\"", self.style.name));
+        result
+    }
 }
 
 impl fmt::Display for Clth {
@@ -340,6 +353,13 @@ impl Clothes {
         map
     }
 
+    pub fn to_toml(&self) -> String {
+        self.list
+            .iter()
+            .map(|clth| clth.borrow().to_toml() )
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
 }
 
 impl fmt::Display for Clothes {
@@ -449,6 +469,15 @@ impl Outfit {
         self.chest.upgrade().is_some() && self.leg.upgrade().is_some() &&
             self.foot.upgrade().is_some()
     }
+
+    pub fn to_toml(&self) -> String {
+        let [chest, leg, foot] = self.to_id_arr();
+        let mut result = String::from("[outfit]\n");
+        result.push_str(&format!("chest = {}\n", chest));
+        result.push_str(&format!("leg = {}\n", leg));
+        result.push_str(&format!("foot = {}\n", foot));
+        result
+    }
 }
 
 impl fmt::Display for Outfit {
@@ -529,6 +558,14 @@ impl Outfits {
             .collect();
 
         black_list.iter().for_each(|id| { self.remove(*id).unwrap(); });
+    }
+    
+    pub fn to_toml(&self) -> String {
+        self.list
+            .iter()
+            .map(|item| item.to_toml())
+            .collect::<Vec<_>>()
+            .join("\n\n")
     }
 }
 

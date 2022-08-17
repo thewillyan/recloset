@@ -28,6 +28,10 @@ impl Data {
             cache: TmpCache::new(),
         }
     }
+
+    pub fn to_toml(&self) -> String {
+        format!("{}\n\n{}", self.clothes.to_toml(), self.outfits.to_toml())
+    }
 }
 
 pub struct TmpCache {
@@ -287,7 +291,7 @@ pub enum Event {
     Quit,
 }
 
-pub fn run(mut data: Data) {
+pub fn run(data: &mut Data) {
     let mut clth_menu = Menu::new("Clothes");
     clth_menu.add_action(Act::new("Add clothing", Event::AddClth));
     clth_menu.add_action(Act::new("Remove clothing", Event::RemoveClth));
@@ -311,15 +315,15 @@ pub fn run(mut data: Data) {
     loop {
         if let Some(act) = runner.run("> ") {
             match act {
-                Event::AddClth => user_add_clth(&mut data),
+                Event::AddClth => user_add_clth(data),
                 Event::RemoveClth => {
-                    user_rm_clth(&mut data);
+                    user_rm_clth(data);
                     data.outfits.clean();
                 },
                 Event::ListClths => println!("{}\n", &data.clothes),
-                Event::UpdateClth => user_update_clth(&mut data),
-                Event::AddOutfit => user_add_outfit(&mut data),
-                Event::RemoveOutfit => user_rm_outfit(&mut data),
+                Event::UpdateClth => user_update_clth(data),
+                Event::AddOutfit => user_add_outfit(data),
+                Event::RemoveOutfit => user_rm_outfit(data),
                 Event::ListOutfits => println!("{}\n", &data.outfits),
                 Event::Back => runner.back().unwrap(),
                 Event::Quit => break,

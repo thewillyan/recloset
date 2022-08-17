@@ -1,6 +1,7 @@
 use recloset::storage::FileData;
 use std::fs::{ self, File };
 use std::process;
+use std::io::Write;
 
 const DATAFILE: &str = "data.toml";
 const DATAPATH: &str = concat!(env!("HOME"), "/.config/recloset");
@@ -24,7 +25,7 @@ fn main() {
         }
     };
 
-    let data = match fdata.to_data() {
+    let mut data = match fdata.to_data() {
         Ok(data) => data,
         Err(msg) => {
             eprintln!("{}:\n  Data error: {}", filedir, msg);
@@ -32,5 +33,14 @@ fn main() {
         }
     };
 
-    recloset::run(data);
+    recloset::run(&mut data);
+
+    let mut file = match File::create(&filedir) {
+        Ok(file) => file,
+        Err(err) => {
+            eprintln!("Error while opening {} for writing: {}", &filedir, err);
+            process::exit(1);
+        }
+    };
+    file.write_all(data.to_toml().as_bytes()).unwrap();
 }
