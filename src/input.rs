@@ -64,13 +64,13 @@ impl InputErr {
         }
     }
 
-    pub fn log_until_ok<F, T>(mut log: T, fill: F) -> Result<T, (T, InputErr)>
-        where F: Fn(&mut T) -> Option<InputErr>
+    pub fn log_until_ok<L, F>(mut log: L, func: F) -> Result<L, (L, InputErr)>
+        where F: Fn(&mut L) -> Result<(), InputErr>
     {
         loop {
-            match fill(&mut log) {
-                None => break Ok(log),
-                Some(err) => {
+            match func(&mut log) {
+                Ok(_) => break Ok(log),
+                Err(err) => {
                     let try_again = Self::handle(&err);
                     if try_again { continue; }
                     else { break Err((log, err)); }
@@ -255,5 +255,15 @@ pub fn select_outfit(outfits: &Outfits) -> Result<&Outfit, InputErr> {
     match outfits.get(id) {
         Some(outfit) => Ok(outfit),
         None => Err(InputErr::wrong("Invalid id!")),
+    }
+}
+
+pub fn confirm(msg: &str) -> Result<bool, InputErr> {
+    let input = read_not_empty(&format!("{}? (y/n) ", msg)).to_lowercase();
+
+    match input.as_str() {
+        "y" => Ok(true),
+        "n" => Ok(false),
+        _ => Err(InputErr::wrong("Invalid answer."))
     }
 }

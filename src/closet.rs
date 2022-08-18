@@ -475,7 +475,7 @@ impl Outfit {
         let mut result = String::from("[outfit]\n");
         result.push_str(&format!("chest = {}\n", chest));
         result.push_str(&format!("leg = {}\n", leg));
-        result.push_str(&format!("foot = {}\n", foot));
+        result.push_str(&format!("foot = {}", foot));
         result
     }
 }
@@ -580,6 +580,75 @@ impl fmt::Display for Outfits {
                 .collect::<Vec<_>>()
                 .join("\n"))
         }
+    }
+}
+
+pub struct ClthBuffer {
+    pub kind: Option<Kind>,
+    pub sex: Option<Sex>,
+    pub size: Option<Size>,
+    pub color: Option<Rgb>,
+    pub price: Option<u64>,
+    pub target: Option<Target>,
+}
+
+impl ClthBuffer {
+    pub fn new() -> ClthBuffer {
+        ClthBuffer {
+            kind: None,
+            sex: None,
+            size: None,
+            color: None,
+            price: None,
+            target: None,
+        }
+    }
+
+    pub fn to_clth(self, id: u32, date: NaiveDate, style: Rc<Style>) -> Clth {
+        Clth::new(
+            id,
+            self.kind.expect("Missing 'kind' field on buffer."),
+            self.sex.expect("Missing 'sex' field on buffer."),
+            self.size.expect("Missing 'size' field on buffer."),
+            self.color.expect("Missing 'color' field on buffer."),
+            self.target.expect("Missing 'target' field on buffer."),
+            date,
+            style
+        )
+    }
+}
+
+pub struct OutfitBuffer {
+    pub chest: Option<Weak<RefCell<Clth>>>,
+    pub leg: Option<Weak<RefCell<Clth>>>,
+    pub foot: Option<Weak<RefCell<Clth>>>
+}
+
+impl OutfitBuffer {
+    pub fn new() -> OutfitBuffer {
+        OutfitBuffer {
+            chest: None,
+            leg: None,
+            foot: None
+        }
+    }
+
+    pub fn to_outfit(self, id: u32) -> Result<Outfit, ErrMsg> {
+        let chest = match self.chest {
+            Some(value) => value,
+            None => return Err("Missing 'chest' field on buffer.")
+        };
+
+        let leg = match self.leg {
+            Some(value) => value,
+            None => return Err("Missing 'leg' field on buffer.")
+        };
+
+        let foot = match self.foot {
+            Some(value) => value,
+            None => return Err("Missing 'foot' field on buffer.")
+        };
+        Outfit::new(id, chest, leg, foot)
     }
 }
 

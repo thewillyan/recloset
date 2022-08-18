@@ -5,7 +5,7 @@ pub mod storage;
 
 // external
 use std::rc::Rc;
-use chrono::{Local, NaiveDate};
+use chrono::Local;
 
 // intern
 use closet::*;
@@ -35,100 +35,88 @@ impl Data {
 }
 
 pub struct TmpCache {
-    pub clth: Option<ClthBuffer>
+    pub clth: Option<ClthBuffer>,
+    pub outfit: Option<OutfitBuffer>
 }
 
 impl TmpCache {
     pub fn new() -> TmpCache {
         TmpCache {
             clth: None,
+            outfit: None
         }
     }
 }
 
-pub struct ClthBuffer {
-    pub kind: Option<Kind>,
-    pub sex: Option<Sex>,
-    pub size: Option<Size>,
-    pub color: Option<Rgb>,
-    pub price: Option<u64>,
-    pub target: Option<Target>,
-}
-
-impl ClthBuffer {
-    pub fn new() -> ClthBuffer {
-        ClthBuffer {
-            kind: None,
-            sex: None,
-            size: None,
-            color: None,
-            price: None,
-            target: None,
-        }
-    }
-
-    pub fn to_clth(self, id: u32, date: NaiveDate, style: Rc<Style>) -> Clth {
-        Clth::new(
-            id,
-            self.kind.expect("Missing 'kind' field on buffer."),
-            self.sex.expect("Missing 'sex' field on buffer."),
-            self.size.expect("Missing 'size' field on buffer."),
-            self.color.expect("Missing 'color' field on buffer."),
-            self.target.expect("Missing 'target' field on buffer."),
-            date,
-            style
-        )
-    }
-}
-
-pub fn fill_clth_buffer(cache: &mut ClthBuffer) -> Option<InputErr> {
+pub fn fill_clth_buffer(cache: &mut ClthBuffer) -> Result<(), InputErr> {
     if let None = cache.kind {
-        match input::kind() {
-            Ok(kind) => cache.kind = Some(kind),
-            Err(err) => return Some(err)
-        }
+        cache.kind = Some(input::kind()?);
     }
 
     if let None = cache.sex {
-        match input::sex() {
-            Ok(sex) => cache.sex = Some(sex),
-            Err(err) => return Some(err)
-        }
+        cache.sex = Some(input::sex()?);
     }
 
     if let None = cache.size {
-        match input::size() {
-            Ok(size) => cache.size = Some(size),
-            Err(err) => return Some(err)
-        }
+        cache.size = Some(input::size()?);
     }
 
     if let None = cache.color {
-        match input::color() {
-            Ok(color) => cache.color = Some(color),
-            Err(err) => return Some(err)
-        }
+        cache.color = Some(input::color()?);
     }
 
     if let None = cache.price {
-        match input::price() {
-            Ok(price) => cache.price = Some(price),
-            Err(err) => return Some(err)
-        }
+        cache.price = Some(input::price()?);
     }
     
     if let None = cache.target {
-        match input::target(cache.price.unwrap()) {
-            Ok(target) => cache.target = Some(target),
-            Err(err) => return Some(err)
-        }
+        cache.target = Some(input::target(cache.price.unwrap())?);
+    }
+    Ok(())
+}
+
+pub fn fill_outfit_buffer(cache: &mut OutfitBuffer, clothes: &Clothes)
+    -> Result<(), InputErr>
+{
+    let map = clothes.map_by_kind();
+    let chests = map.get("chest").unwrap();
+    let leggings = map.get("leg").unwrap();
+    let footwears = map.get("foot").unwrap();
+
+    let separator = ">-<".repeat(10);
+
+    if let None = cache.chest {
+        println!("{}", chests);
+        cache.chest = Some(Rc::downgrade(&input::select_clth(chests)?));
+        println!("{}", separator);
     }
 
-    None
+    if let None = cache.leg {
+        println!("{}", leggings);
+        cache.leg = Some(Rc::downgrade(&input::select_clth(leggings)?));
+        println!("{}", separator);
+    }
+
+    if let None = cache.foot {
+        println!("{}", footwears);
+        cache.foot = Some(Rc::downgrade(&input::select_clth(footwears)?));
+    }
+    Ok(())
 }
 
 pub fn user_add_clth(data: &mut Data) {
-    let result = InputErr::log_until_ok(ClthBuffer::new(), fill_clth_buffer);
+    let buffer = match data.cache.clth.take() {
+        Some(buffer) => {
+            let use_cache = InputErr::until_ok(|| {
+                input::confirm("Restore last session")
+            }).unwrap();
+
+            if use_cache { buffer } else { ClthBuffer::new() }
+        },
+        None => ClthBuffer::new(),
+    };
+
+    let result = InputErr::log_until_ok(buffer, fill_clth_buffer);
     match result {
         Ok(buffer) => {
             let stl_name = InputErr::until_ok(input::style_name);
@@ -221,45 +209,36 @@ pub fn user_update_clth(data: &mut Data) {
 }
 
 pub fn user_add_outfit(data: &mut Data) {
-    let map = data.clothes.map_by_kind();
-    let chests = map.get("chest").unwrap();
-    let leggings = map.get("leg").unwrap();
-    let footwears = map.get("foot").unwrap();
+    let cache = match data.cache.outfit.take() {
+        Some(value) => {
+            let use_cache = InputErr::until_ok(|| {
+                input::confirm("Restore last session")
+            }).unwrap();
 
-    let separator = ">-<".repeat(10);
-
-    println!("{}", chests);
-    let chest = match InputErr::until_ok(|| input::select_clth(chests)) {
-        Some(clth) => clth,
-        None => return,
-    };
-    println!("{}", separator);
-
-    println!("{}", leggings);
-    let leg = match InputErr::until_ok(|| input::select_clth(leggings)) {
-        Some(clth) => clth,
-        None => return,
-    };
-    println!("{}", separator);
-
-    println!("{}", footwears);
-    let foot = match InputErr::until_ok(|| input::select_clth(footwears)) {
-        Some(clth) => clth,
-        None => return,
+            if use_cache { value } else { OutfitBuffer::new() }
+        },
+        None => OutfitBuffer::new()
     };
 
-    let outfit = Outfit::new(
-        data.outfits.request_id(),
-        Rc::downgrade(&chest),
-        Rc::downgrade(&leg),
-        Rc::downgrade(&foot)
-    );
+    let cache_res = InputErr::log_until_ok(cache, |log| {
+        fill_outfit_buffer(log, &data.clothes)
+    });
+
+    let cache = match cache_res {
+        Ok(buffer) => buffer,
+        Err((buffer, _)) => {
+            data.cache.outfit = Some(buffer);
+            return;
+        },
+    };
+
+    let outfit = cache.to_outfit(data.outfits.request_id());
 
     let result = match outfit {
         Ok(set) => data.outfits.add(set),
         Err(msg) => {
             eprintln!("Error while creating outfit: {}", msg);
-            return;
+            return ;
         },
     };
 
