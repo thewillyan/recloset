@@ -1,4 +1,4 @@
-# Ecloset :seedling:
+# Recloset :crab:
 [![license](https://img.shields.io/github/license/thewillyan/ecloset)](https://github.com/thewillyan/recloset/blob/main/LICENSE)
 [![issues](https://img.shields.io/github/issues/thewillyan/ecloset)](https://github.com/thewillyan/recloset/issues)
 
